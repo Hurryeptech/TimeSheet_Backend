@@ -8,5 +8,5 @@ mongoose.connect(process.env.MONGO_URI).then(()=>{
 
 
 app.listen(process.env.PORT,()=>{
-    console.log("Server Started")
+    console.log("Server Started",process.env.PORT)
 })

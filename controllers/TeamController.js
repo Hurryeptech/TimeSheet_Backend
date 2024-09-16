@@ -1,3 +1,4 @@
+const mongoose= require("mongoose")
 const CatchAsyncError = require("../middlewares/CatchAsyncError")
 const TaskModel = require("../models/TaskModel")
 const TeamModel = require("../models/TeamModel")
@@ -14,7 +15,8 @@ exports.createTeam = CatchAsyncError(async(req,res)=>{
         teamName: teamName,
         users: user.id
     })
-    
+    user.team.push(newTeam.id)
+    await user.save()
     
     
     res.status(201).json({
@@ -28,23 +30,28 @@ exports.addMembers = CatchAsyncError(async(req,res,next)=>{
 
     const {members} = req.body
     const {id} = req.params
-   console.log(req.body)
     const team = await TeamModel.findById(id)
-    console.log("Hello v")
     const user = await UserModel.findOne({userEmail: members})
-    console.log(user)
-    const alreadyMember = await TeamModel.findOne({members: user.id})
-    
-    if(alreadyMember)
+    const admin = team.users.includes(user.id)
+    if(admin)
+    {
+        return next(new ErrorHandler("Admin Cannot be a member",400))
+    }
+    const alreadymember = team.members.includes(user.id)
+ 
+
+    if(alreadymember)
     {
         return next(new ErrorHandler("already member",400))
     }
   
    
    team.members.push(user.id)
-   user.team.push(team.id)
-   
-   await user.save()
+ 
+   const task = await TaskModel.create({internName: user.userName, user: user.id })
+    task.teams.push(team.id)
+   team.tasks.push(task.id)
+    await task.save()
    await team.save()
 
     res.status(201).json({
@@ -55,56 +62,167 @@ exports.addMembers = CatchAsyncError(async(req,res,next)=>{
 
 })
 
-exports.getTeams = CatchAsyncError(async(req,res)=>{
+exports.getTeams = CatchAsyncError(async(req,res,next)=>{
 
     const {id} = req.user
+
     const user = await UserModel.findById(id)
 
     const team = await TeamModel.find({users: user.id})
-    if(!team)
+    // const members = await UserModel.aggregate([
+    //     {
+    //         $lookup:{
+    //             from: "teams",
+    //             localField:"_id",
+    //             foreignField:"members",
+    //             as:"memberDetails"
+    //         }
+    //     }
+    // ])
+
+const userId = new mongoose.Types.ObjectId(user.id)
+const results2 = await TeamModel.aggregate([
     {
-        return next(new ErrorHandler("Not a Member Of a team",401))
-    }
-  
-    const members = await UserModel.find({id: team.members})
-
-    // const tasks = await TeamModel.find({tasks: await TaskModel.find({teams: team.id})})
-
-    // const tasks = await TeamModel.aggregate({$lookup{from: "tasks",localField:"tasks",foreignField: "_id",as:"taskList"}})
-
-    const results = await TeamModel.aggregate([
-        {
-          $lookup: {
-            from: 'tasks',        
-            localField: 'tasks', 
-            foreignField: '_id',      
-            as: 'Details'      
-          }
+        $match:{
+            $expr:{
+                $in:[
+                    userId,"$members"
+                ]
+            }
         }
-      ]);
-    
+    },
+    {
+        $lookup:{
+            from:"tasks",
+            localField:"tasks",
+            foreignField:"_id",
+            as:"members"
+        }
+    }
+])
+
+
+    // const memberTeams = await TeamModel.find({members: user.id})
+    let results =[]
+    let memberTasks =[]
+    if(team.length > 0)
+    {
+       
+         results = await TeamModel.aggregate([
+            {
+            $match:{
+                $expr:{
+                    $in:[
+                        userId,"$users"
+                    ]
+                }
+            }
+        },
+            {
+              $lookup: {
+                from: 'tasks',        
+                localField: 'tasks', 
+                foreignField: '_id',      
+                as: 'Details'      
+              }
+            }
+          ]);      
+    }
+
+    // if(memberTeams.length > 0)
+    // {
+    //     memberTasks = await TeamModel.aggregate([
+    //         {
+    //             $lookup:{
+    //                 from: "tasks",
+    //                 localField: "tasks",
+    //                 foreignField: "_id",
+    //                 as:"Details_1"
+    //             }
+    //         }
+    //     ])
+    // }
  
     res.json({
         success: true,
-        team,
-        members,
-        results
-        
-
+        results,
+        results2,userId
     })
 
 })
 
-exports.addTasks = CatchAsyncError(async(req,res)=>{
+// exports.addTasks = CatchAsyncError(async(req,res)=>{
 
-    const {internName, assignee,dueDate,task,status,description} = req.body
+//     const {internName, assignee,dueDate,task,status,description} = req.body
 
-    const {teamId} = req.query
+//     const {teamId} = req.query
 
-    console.log(req.query)
+//     console.log(req.query)
 
     
+// })
+
+exports.getAssignee = CatchAsyncError(async(req,res)=>{
+
+    let id =req.params.id
+    id= new mongoose.Types.ObjectId(id)
+    const names = await TeamModel.aggregate([
+        {
+            $match:{
+                _id: id
+            }
+        },
+        {
+           $lookup:{
+            from:"users",
+            localField:"users",
+            foreignField:"_id",
+            as:"user"
+           }
+        },
+        {
+            $lookup:{
+               from: "users",
+               localField:"members",
+               foreignField:"_id",
+               as:"assignee"
+            }
+        },
+        {
+            $project:{
+               assignees:{
+                $concatArrays:[
+                    "$user","$assignee"
+                ]
+               }
+            }
+        },
+     
+        
+      
+    ])
+   
+    res.status(200).json({
+        names
+    })
 })
 
+exports.deleteTeam = CatchAsyncError(async(req,res)=>{
 
+    const {id}  = req.params
 
+    const {userEmail} = req.user
+    const team = await TeamModel.findByIdAndDelete(id)
+    if(!team)
+    {
+        return next(new ErrorHandler("No resource Found to deleted",204))
+    }
+
+    const task = await TaskModel.deleteMany({teams: team.id})
+
+    const user = await UserModel.updateOne({userEmail},{$pull:{team: team.id}})
+
+    res.status(200).json({
+        success: true
+    }) 
+})

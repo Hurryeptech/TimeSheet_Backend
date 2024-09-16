@@ -1,36 +1,53 @@
 const mongoose = require("mongoose")
 
 const taskSchema = new mongoose.Schema({
+    date:{
+        type: Date
+    },
     internName:{
         type: String,
-        required:[true,"Please Enter InternName"]
+
+    },
+    client:{
+        type: String
     },
     assignee:{
         type: String,
-        required:[true,"Please Enter Assignee"]
+      
     },
     dueDate:{
         type: Date,
-        required:[true,"Please Enter Due Date"]
+     
     },
     task:{
         type:String,
-        required:[true,"Please Enter Task Name"]
+     
     },
     status:{
         type: String,
-        enum:["Completed","In Progress"]
+        
     },
     description:{
         type: String,
+      
     
+    },
+    details:{
+        type:String
+    },
+    employeeStatus:{
+        type: String
     },
     teams:[
         {
             type: mongoose.Types.ObjectId,
             ref: "teams"
         }
-    ]
+    ],
+    user:{
+        type: mongoose.Types.ObjectId,
+        ref: "users"
+    }
 })
 
 module.exports = mongoose.model("task",taskSchema)
