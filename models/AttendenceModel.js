@@ -3,14 +3,22 @@ const mongoose = require("mongoose")
 const attendenceSchema = new mongoose.Schema({
 
     date:{
-        type: String,
-        required:[true,"Please Enter Date"]
+        type: Date,
     },
-    time:{
+    loginTime:{
         type: Date
     },
     logoutTime:{
         type: Date
+    },
+    halfDay:{
+        type: Number
+    },
+    late:{
+        type: Number
+    },
+    status:{
+        type: String
     },
     user:{
         type: mongoose.Types.ObjectId,

@@ -6,11 +6,12 @@ const SendMail = require("../utils/SendEmail")
 const moment = require("moment")
 const UserModel = require("../models/UserModel")
 
+
 exports.addEvent = CatchAsyncError(async(req,res,next)=>{
 
     const {title,start,end} = req.body
     const {id}= req.user
-    console.log(req.body)
+
     // const {userEmail} = req.user
 
     const user = await UserModel.findById(id)
@@ -35,7 +36,7 @@ exports.addEvent = CatchAsyncError(async(req,res,next)=>{
     // {
     //    return next(new ErrorHandler("Some Error In Sending Email",408))
     // }
-    console.log("inside Event")
+
     res.send(createEvent)
 
 })
@@ -65,5 +66,34 @@ exports.getAllEvent = CatchAsyncError(async(req,res)=>{
 })
 
 
+exports.updateEvents = CatchAsyncError(async(req,res,next)=>{
 
+    
+    const {event_id} = req.params
+    const {title,start,end} = req.body
+ 
+
+    const updatedEvent = await EventModel.findByIdAndUpdate(event_id,{title: title,start: start,end: end}, { new: true })
+
+    if(!updatedEvent)
+    {
+        return next(new ErrorHandler("Error while updating",500))
+    }
+
+    res.json(updatedEvent)
+})
+
+exports.deleteEvent = CatchAsyncError(async(req,res,next)=>{
+
+    const {event_id} = req.params
+    console.log(req.params)
+    const deleteEvent = await EventModel.findByIdAndDelete(event_id)
+
+    if(!deleteEvent)
+        {
+            return next(new ErrorHandler("Error while updating",500))
+        }
+
+    res.json(deleteEvent)
+})
 
